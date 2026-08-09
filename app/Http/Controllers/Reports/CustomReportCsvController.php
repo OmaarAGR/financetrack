@@ -26,7 +26,7 @@ class CustomReportCsvController extends Controller
             $handle = fopen('php://output', 'w');
             // BOM para que Excel detecte UTF-8 correctamente.
             fwrite($handle, "\xEF\xBB\xBF");
-            fputcsv($handle, ['Fecha', 'Tipo', 'Descripción', 'Categoría', 'Cuenta', 'Valor']);
+            fputcsv($handle, ['Fecha', 'Tipo', 'Descripción', 'Categoría', 'Cuenta', 'Moneda', 'Valor']);
 
             foreach ($transactions as $transaction) {
                 fputcsv($handle, [
@@ -35,6 +35,7 @@ class CustomReportCsvController extends Controller
                     $transaction->description,
                     $transaction->category?->name,
                     $transaction->account->name,
+                    $transaction->account->currency,
                     $transaction->amount->toDecimalString(),
                 ]);
             }

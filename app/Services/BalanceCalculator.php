@@ -6,6 +6,7 @@ use App\Enums\TransactionType;
 use App\Models\Account;
 use App\Models\User;
 use App\Support\Money;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 
 /**
@@ -50,6 +51,29 @@ class BalanceCalculator
         );
 
         return Money::of($decimal);
+    }
+
+    /**
+     * Net worth grouped by currency, so balances in different currencies are
+     * never added together as if they were the same unit.
+     *
+     * @return Collection<string, Money>
+     */
+    public function netWorthByCurrency(User $user): Collection
+    {
+        $byCurrency = $user->accounts()
+            ->where('is_active', true)
+            ->get()
+            ->groupBy('currency')
+            ->map(fn (Collection $accounts) => $accounts->reduce(
+                fn (Money $carry, Account $account) => $carry->add($this->accountBalance($account)),
+                Money::zero(),
+            ))
+            ->sortKeys();
+
+        return $byCurrency->isEmpty()
+            ? collect([$user->currency_default => Money::zero()])
+            : $byCurrency;
     }
 
     public function forgetAccount(Account $account): void

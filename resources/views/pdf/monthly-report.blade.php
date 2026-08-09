@@ -25,50 +25,57 @@
     <h1>Reporte financiero mensual</h1>
     <p class="subtitle">{{ $user->name }} &middot; {{ ucfirst($periodLabel) }}</p>
 
-    <table class="grid">
-        <tr>
-            <td>
-                <div class="label">Ingresos</div>
-                <div class="value green">{{ $summary['income']->format($user->currency_default, $user->locale) }}</div>
-            </td>
-            <td>
-                <div class="label">Gastos</div>
-                <div class="value red">{{ $summary['expense']->format($user->currency_default, $user->locale) }}</div>
-            </td>
-            <td>
-                <div class="label">Ahorro ({{ number_format($summary['savingsRate'], 1) }}%)</div>
-                <div class="value">{{ $summary['savings']->format($user->currency_default, $user->locale) }}</div>
-            </td>
-        </tr>
-    </table>
+    @foreach ($summary as $currency => $currencySummary)
+        @if ($summary->count() > 1)
+            <h2>{{ $currency }}</h2>
+        @endif
 
-    @if (! empty($highlights))
-        <h2>Análisis del mes</h2>
-        <ul class="insights">
-            @foreach ($highlights as $line)
-                <li>{{ $line }}</li>
-            @endforeach
-        </ul>
-    @endif
-
-    <h2>Gastos por categoría</h2>
-    @if ($expenseByCategory->isEmpty())
-        <p>Sin gastos registrados en este periodo.</p>
-    @else
-        <table class="list">
-            <thead>
-                <tr><th>Categoría</th><th style="text-align:right">Valor</th><th style="text-align:right">%</th></tr>
-            </thead>
-            <tbody>
-                @foreach ($expenseByCategory as $row)
-                    <tr>
-                        <td>{{ $row['category']?->name ?? 'Sin categoría' }}</td>
-                        <td style="text-align:right">{{ $row['total']->format($user->currency_default, $user->locale) }}</td>
-                        <td style="text-align:right">{{ number_format($row['percentage'], 1) }}%</td>
-                    </tr>
-                @endforeach
-            </tbody>
+        <table class="grid">
+            <tr>
+                <td>
+                    <div class="label">Ingresos</div>
+                    <div class="value green">{{ $currencySummary['income']->format($currency, $user->locale) }}</div>
+                </td>
+                <td>
+                    <div class="label">Gastos</div>
+                    <div class="value red">{{ $currencySummary['expense']->format($currency, $user->locale) }}</div>
+                </td>
+                <td>
+                    <div class="label">Ahorro ({{ number_format($currencySummary['savingsRate'], 1) }}%)</div>
+                    <div class="value">{{ $currencySummary['savings']->format($currency, $user->locale) }}</div>
+                </td>
+            </tr>
         </table>
-    @endif
+
+        @if (! empty($highlights[$currency]))
+            <h2>Análisis del mes</h2>
+            <ul class="insights">
+                @foreach ($highlights[$currency] as $line)
+                    <li>{{ $line }}</li>
+                @endforeach
+            </ul>
+        @endif
+
+        <h2>Gastos por categoría</h2>
+        @php $categoryRows = $expenseByCategory->get($currency, collect()); @endphp
+        @if ($categoryRows->isEmpty())
+            <p>Sin gastos registrados en este periodo.</p>
+        @else
+            <table class="list">
+                <thead>
+                    <tr><th>Categoría</th><th style="text-align:right">Valor</th><th style="text-align:right">%</th></tr>
+                </thead>
+                <tbody>
+                    @foreach ($categoryRows as $row)
+                        <tr>
+                            <td>{{ $row['category']?->name ?? 'Sin categoría' }}</td>
+                            <td style="text-align:right">{{ $row['total']->format($currency, $user->locale) }}</td>
+                            <td style="text-align:right">{{ number_format($row['percentage'], 1) }}%</td>
+                        </tr>
+                    @endforeach
+                </tbody>
+            </table>
+        @endif
+    @endforeach
 </body>
 </html>

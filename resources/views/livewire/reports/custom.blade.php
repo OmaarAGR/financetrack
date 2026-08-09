@@ -4,6 +4,7 @@ use App\Enums\TransactionType;
 use App\Models\Transaction;
 use App\Support\Money;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 use Livewire\Attributes\Layout;
 use Livewire\Volt\Component;
 
@@ -27,14 +28,22 @@ new #[Layout('layouts.app')] class extends Component
             ->orderBy('date')
             ->get();
 
-        $income = $transactions->where('type', TransactionType::Income)->reduce(fn (Money $c, Transaction $t) => $c->add($t->amount), Money::zero());
-        $expense = $transactions->where('type', TransactionType::Expense)->reduce(fn (Money $c, Transaction $t) => $c->add($t->amount), Money::zero());
+        $byCurrency = $transactions->groupBy(fn (Transaction $t) => $t->account->currency);
+
+        $totals = $byCurrency->map(function (Collection $rows) {
+            $income = $rows->where('type', TransactionType::Income)->reduce(fn (Money $c, Transaction $t) => $c->add($t->amount), Money::zero());
+            $expense = $rows->where('type', TransactionType::Expense)->reduce(fn (Money $c, Transaction $t) => $c->add($t->amount), Money::zero());
+
+            return [
+                'income' => $income,
+                'expense' => $expense,
+                'savings' => $income->subtract($expense),
+            ];
+        });
 
         return [
             'transactions' => $transactions,
-            'income' => $income,
-            'expense' => $expense,
-            'savings' => $income->subtract($expense),
+            'totals' => $totals,
         ];
     }
 }; ?>
@@ -62,17 +71,19 @@ new #[Layout('layouts.app')] class extends Component
             </a>
         </div>
 
-        <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
-            <x-stat-card :label="__('Ingresos del periodo')" icon="arrow-up-circle" icon-color="text-green-600 dark:text-green-400" icon-bg="bg-green-50 dark:bg-green-500/10">
-                <x-money :amount="$income" />
-            </x-stat-card>
-            <x-stat-card :label="__('Gastos del periodo')" icon="arrow-down-circle" icon-color="text-red-600 dark:text-red-400" icon-bg="bg-red-50 dark:bg-red-500/10">
-                <x-money :amount="$expense" />
-            </x-stat-card>
-            <x-stat-card :label="__('Ahorro del periodo')" icon="chart-pie">
-                <x-money :amount="$savings" />
-            </x-stat-card>
-        </div>
+        @foreach ($totals as $currency => $currencyTotals)
+            <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                <x-stat-card :label="__('Ingresos del periodo').' ('.$currency.')'" icon="arrow-up-circle" icon-color="text-green-600 dark:text-green-400" icon-bg="bg-green-50 dark:bg-green-500/10">
+                    <x-money :amount="$currencyTotals['income']" :currency="$currency" />
+                </x-stat-card>
+                <x-stat-card :label="__('Gastos del periodo').' ('.$currency.')'" icon="arrow-down-circle" icon-color="text-red-600 dark:text-red-400" icon-bg="bg-red-50 dark:bg-red-500/10">
+                    <x-money :amount="$currencyTotals['expense']" :currency="$currency" />
+                </x-stat-card>
+                <x-stat-card :label="__('Ahorro del periodo').' ('.$currency.')'" icon="chart-pie">
+                    <x-money :amount="$currencyTotals['savings']" :currency="$currency" />
+                </x-stat-card>
+            </div>
+        @endforeach
 
         @if ($transactions->isEmpty())
             <x-empty-state icon="list-bullet" :title="__('Sin transacciones en este rango de fechas')" />
@@ -95,7 +106,7 @@ new #[Layout('layouts.app')] class extends Component
                                     <td class="px-4 py-2.5 text-sm text-gray-700 dark:text-gray-300">{{ $transaction->description ?: $transaction->category?->name }}</td>
                                     <td class="px-4 py-2.5 text-sm text-gray-500 dark:text-gray-400">{{ $transaction->account->name }}</td>
                                     <td class="whitespace-nowrap px-4 py-2.5 text-right text-sm font-medium tabular-nums {{ $transaction->type->value === 'income' ? 'text-green-600 dark:text-green-400' : ($transaction->type->value === 'expense' ? 'text-red-600 dark:text-red-400' : 'text-gray-500') }}">
-                                        <x-money :amount="$transaction->amount" />
+                                        <x-money :amount="$transaction->amount" :currency="$transaction->account->currency" />
                                     </td>
                                 </tr>
                             @endforeach

@@ -20,19 +20,20 @@ class CheckLowAccountBalance
 
     public function handle(TransactionsMutated $event): void
     {
-        $dailyAverage = $this->trailingDailyExpenseAverage($event->user->id);
-
-        if ($dailyAverage->isZero()) {
-            return;
-        }
-
-        $threshold = $dailyAverage->multiply(3);
+        $dailyAverages = [];
 
         foreach ($event->accounts as $account) {
             if (! $account->is_active) {
                 continue;
             }
 
+            $dailyAverage = $dailyAverages[$account->currency] ??= $this->trailingDailyExpenseAverage($event->user->id, $account->currency);
+
+            if ($dailyAverage->isZero()) {
+                continue;
+            }
+
+            $threshold = $dailyAverage->multiply(3);
             $balance = $this->balances->accountBalance($account->fresh());
 
             if ($balance->greaterThan($threshold) || $balance->isNegative()) {
@@ -50,13 +51,15 @@ class CheckLowAccountBalance
         }
     }
 
-    private function trailingDailyExpenseAverage(int $userId): Money
+    private function trailingDailyExpenseAverage(int $userId, string $currency): Money
     {
         $total = Transaction::query()
-            ->where('user_id', $userId)
-            ->where('type', TransactionType::Expense->value)
-            ->where('date', '>=', now()->subDays(30))
-            ->sum('amount');
+            ->join('accounts', 'accounts.id', '=', 'transactions.account_id')
+            ->where('transactions.user_id', $userId)
+            ->where('transactions.type', TransactionType::Expense->value)
+            ->where('accounts.currency', $currency)
+            ->where('transactions.date', '>=', now()->subDays(30))
+            ->sum('transactions.amount');
 
         return Money::of($total)->divide(30);
     }

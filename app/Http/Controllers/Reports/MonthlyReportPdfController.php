@@ -22,7 +22,9 @@ class MonthlyReportPdfController extends Controller
         $pdf = Pdf::loadView('pdf.monthly-report', [
             'user' => $user,
             'summary' => $summary,
-            'highlights' => $insights->monthlyHighlights($summary, $user, $year, $month),
+            'highlights' => $summary->map(
+                fn (array $currencySummary) => $insights->monthlyHighlights($currencySummary, $user, $year, $month)
+            ),
             'expenseByCategory' => $reports->expenseByCategory($user, $year, $month),
             'periodLabel' => Carbon::create($year, $month, 1)->translatedFormat('F Y'),
         ]);

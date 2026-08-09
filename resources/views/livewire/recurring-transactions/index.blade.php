@@ -183,7 +183,7 @@ new #[Layout('layouts.app')] class extends Component
                                 <td class="px-4 py-3 text-sm text-gray-600 dark:text-gray-300">{{ $recurring->frequency->label() }}</td>
                                 <td class="px-4 py-3 text-sm text-gray-600 dark:text-gray-300">{{ $recurring->next_due_date->translatedFormat('d M Y') }}</td>
                                 <td class="px-4 py-3 text-right text-sm font-semibold tabular-nums {{ $recurring->type->value === 'income' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400' }}">
-                                    <x-money :amount="$recurring->amount" />
+                                    <x-money :amount="$recurring->amount" :currency="$recurring->account->currency" />
                                 </td>
                                 <td class="whitespace-nowrap px-4 py-3 text-right">
                                     <div class="flex items-center justify-end gap-1">

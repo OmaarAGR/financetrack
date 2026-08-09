@@ -27,6 +27,7 @@ class InsightService
     public function monthlyHighlights(array $summary, ?User $user = null, ?int $year = null, ?int $month = null): array
     {
         $lines = [];
+        $currency = $summary['currency'] ?? $user?->currency_default ?? 'COP';
 
         if (! $summary['income']->isZero() || ! $summary['expense']->isZero()) {
             $lines[] = $this->expenseVsPreviousMonth($summary);
@@ -43,13 +44,13 @@ class InsightService
         if ($summary['savings']->isPositive() && ! $summary['income']->isZero()) {
             $lines[] = sprintf(
                 'Ahorraste %s este mes, equivalente al %s%% de tus ingresos.',
-                $summary['savings']->format(),
+                $summary['savings']->format($currency),
                 number_format($summary['savingsRate'], 1),
             );
         } elseif ($summary['savings']->isNegative()) {
             $lines[] = sprintf(
                 'Gastaste %s más de lo que ingresó este mes.',
-                $summary['savings']->abs()->format(),
+                $summary['savings']->abs()->format($currency),
             );
         }
 
@@ -61,25 +62,25 @@ class InsightService
         }
 
         if ($user && $year && $month) {
-            $ants = $this->antExpenses($user, $year, $month, $summary['expense']);
+            $ants = $this->antExpenses($user, $year, $month, $currency, $summary['expense']);
             if ($ants && $ants['percentageOfExpense'] >= 5) {
                 $lines[] = sprintf(
                     'Tus gastos hormiga (compras menores a $%s) sumaron %s este mes en %d %s — %s%% de tu gasto total.',
                     number_format(self::ANT_EXPENSE_THRESHOLD, 0, ',', '.'),
-                    $ants['total']->format(),
+                    $ants['total']->format($currency),
                     $ants['count'],
                     $ants['count'] === 1 ? 'movimiento' : 'movimientos',
                     number_format($ants['percentageOfExpense'], 1),
                 );
             }
 
-            $unusual = $this->unusualExpenses($user, $year, $month);
+            $unusual = $this->unusualExpenses($user, $year, $month, $currency);
             if ($unusual->isNotEmpty()) {
                 $top = $unusual->sortByDesc(fn (Transaction $t) => $t->amount->toFloat())->first();
                 $lines[] = sprintf(
                     'Detectamos un gasto inusual: %s (%s) está muy por encima de tu promedio habitual en %s.',
                     $top->description ?: $top->category?->name,
-                    $top->amount->format(),
+                    $top->amount->format($currency),
                     $top->category?->name ?? 'esa categoría',
                 );
             }
@@ -94,12 +95,15 @@ class InsightService
      *
      * @return array{total: Money, count: int, percentageOfExpense: float}|null
      */
-    public function antExpenses(User $user, int $year, int $month, Money $totalExpense): ?array
+    public function antExpenses(User $user, int $year, int $month, string $currency, Money $totalExpense): ?array
     {
         $rows = Transaction::query()
-            ->where('type', TransactionType::Expense->value)
-            ->whereYear('date', $year)->whereMonth('date', $month)
-            ->where('amount', '<', self::ANT_EXPENSE_THRESHOLD)
+            ->join('accounts', 'accounts.id', '=', 'transactions.account_id')
+            ->where('transactions.type', TransactionType::Expense->value)
+            ->where('accounts.currency', $currency)
+            ->whereYear('transactions.date', $year)->whereMonth('transactions.date', $month)
+            ->where('transactions.amount', '<', self::ANT_EXPENSE_THRESHOLD)
+            ->select('transactions.*')
             ->get();
 
         if ($rows->isEmpty()) {
@@ -122,16 +126,18 @@ class InsightService
      *
      * @return Collection<int, Transaction>
      */
-    public function unusualExpenses(User $user, int $year, int $month): Collection
+    public function unusualExpenses(User $user, int $year, int $month, string $currency): Collection
     {
         $periodStart = now()->createFromDate($year, $month, 1)->subMonths(6)->startOfMonth();
         $periodEnd = now()->createFromDate($year, $month, 1)->startOfMonth();
 
         $stats = Transaction::query()
-            ->where('type', TransactionType::Expense->value)
-            ->whereBetween('date', [$periodStart, $periodEnd])
-            ->selectRaw('category_id, AVG(amount) as avg_amount, STDDEV(amount) as stddev_amount, COUNT(*) as n')
-            ->groupBy('category_id')
+            ->join('accounts', 'accounts.id', '=', 'transactions.account_id')
+            ->where('transactions.type', TransactionType::Expense->value)
+            ->where('accounts.currency', $currency)
+            ->whereBetween('transactions.date', [$periodStart, $periodEnd])
+            ->selectRaw('transactions.category_id as category_id, AVG(transactions.amount) as avg_amount, STDDEV(transactions.amount) as stddev_amount, COUNT(*) as n')
+            ->groupBy('transactions.category_id')
             ->having('n', '>=', 3)
             ->get()
             ->keyBy('category_id');
@@ -141,10 +147,13 @@ class InsightService
         }
 
         return Transaction::query()
+            ->join('accounts', 'accounts.id', '=', 'transactions.account_id')
             ->with('category')
-            ->where('type', TransactionType::Expense->value)
-            ->whereYear('date', $year)->whereMonth('date', $month)
-            ->whereIn('category_id', $stats->keys())
+            ->where('transactions.type', TransactionType::Expense->value)
+            ->where('accounts.currency', $currency)
+            ->whereYear('transactions.date', $year)->whereMonth('transactions.date', $month)
+            ->whereIn('transactions.category_id', $stats->keys())
+            ->select('transactions.*')
             ->get()
             ->filter(function (Transaction $transaction) use ($stats) {
                 $stat = $stats->get($transaction->category_id);

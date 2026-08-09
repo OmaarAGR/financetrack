@@ -90,7 +90,7 @@
                                     <td class="whitespace-nowrap px-4 py-3 text-right text-sm font-semibold tabular-nums
                                         {{ $transaction->type->value === 'income' ? 'text-green-600 dark:text-green-400' : ($transaction->type->value === 'expense' ? 'text-red-600 dark:text-red-400' : 'text-gray-500 dark:text-gray-400') }}">
                                         @if ($transaction->type->value === 'income') + @elseif ($transaction->type->value === 'expense') &minus; @endif
-                                        <x-money :amount="$transaction->amount" />
+                                        <x-money :amount="$transaction->amount" :currency="$transaction->account->currency" />
                                     </td>
                                     <td class="whitespace-nowrap px-4 py-3 text-right">
                                         <div class="flex items-center justify-end gap-1">

@@ -18,7 +18,7 @@ class NetWorthBadge extends Component
     public function render(BalanceCalculator $calculator): View
     {
         return view('livewire.net-worth-badge', [
-            'netWorth' => $calculator->netWorth(auth()->user()),
+            'netWorthByCurrency' => $calculator->netWorthByCurrency(auth()->user()),
         ]);
     }
 }

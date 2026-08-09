@@ -23,52 +23,58 @@
     <h1>Reporte financiero anual</h1>
     <p class="subtitle">{{ $user->name }} &middot; {{ $year }}</p>
 
-    <table class="grid">
-        <tr>
-            <td>
-                <div class="label">Ingresos totales</div>
-                <div class="value green">{{ $summary['income']->format($user->currency_default, $user->locale) }}</div>
-            </td>
-            <td>
-                <div class="label">Gastos totales</div>
-                <div class="value red">{{ $summary['expense']->format($user->currency_default, $user->locale) }}</div>
-            </td>
-            <td>
-                <div class="label">Ahorro anual ({{ number_format($summary['savingsRate'], 1) }}%)</div>
-                <div class="value">{{ $summary['savings']->format($user->currency_default, $user->locale) }}</div>
-            </td>
-            <td>
-                <div class="label">Promedio mensual de gasto</div>
-                <div class="value">{{ $summary['avgMonthlyExpense']->format($user->currency_default, $user->locale) }}</div>
-            </td>
-        </tr>
-    </table>
+    @foreach ($summary as $currency => $currencySummary)
+        @if ($summary->count() > 1)
+            <h2>{{ $currency }}</h2>
+        @endif
 
-    @if ($summary['topCategory'])
-        <p><strong>Categoría donde más gastaste:</strong> {{ $summary['topCategory']['category']?->name }} ({{ number_format($summary['topCategory']['percentage'], 1) }}% del total)</p>
-    @endif
-    @if ($summary['bestIncomeMonth'])
-        <p><strong>Mes con mayores ingresos:</strong> {{ ucfirst($summary['bestIncomeMonth']['label']) }} ({{ $summary['bestIncomeMonth']['income']->format($user->currency_default, $user->locale) }})</p>
-    @endif
-    @if ($summary['worstExpenseMonth'])
-        <p><strong>Mes con mayores gastos:</strong> {{ ucfirst($summary['worstExpenseMonth']['label']) }} ({{ $summary['worstExpenseMonth']['expense']->format($user->currency_default, $user->locale) }})</p>
-    @endif
+        <table class="grid">
+            <tr>
+                <td>
+                    <div class="label">Ingresos totales</div>
+                    <div class="value green">{{ $currencySummary['income']->format($currency, $user->locale) }}</div>
+                </td>
+                <td>
+                    <div class="label">Gastos totales</div>
+                    <div class="value red">{{ $currencySummary['expense']->format($currency, $user->locale) }}</div>
+                </td>
+                <td>
+                    <div class="label">Ahorro anual ({{ number_format($currencySummary['savingsRate'], 1) }}%)</div>
+                    <div class="value">{{ $currencySummary['savings']->format($currency, $user->locale) }}</div>
+                </td>
+                <td>
+                    <div class="label">Promedio mensual de gasto</div>
+                    <div class="value">{{ $currencySummary['avgMonthlyExpense']->format($currency, $user->locale) }}</div>
+                </td>
+            </tr>
+        </table>
 
-    <h2>Comparación mes a mes</h2>
-    <table class="list">
-        <thead>
-            <tr><th>Mes</th><th style="text-align:right">Ingresos</th><th style="text-align:right">Gastos</th><th style="text-align:right">Ahorro</th></tr>
-        </thead>
-        <tbody>
-            @foreach ($summary['months'] as $row)
-                <tr>
-                    <td>{{ ucfirst($row['label']) }}</td>
-                    <td style="text-align:right">{{ $row['income']->format($user->currency_default, $user->locale) }}</td>
-                    <td style="text-align:right">{{ $row['expense']->format($user->currency_default, $user->locale) }}</td>
-                    <td style="text-align:right">{{ $row['savings']->format($user->currency_default, $user->locale) }}</td>
-                </tr>
-            @endforeach
-        </tbody>
-    </table>
+        @if ($currencySummary['topCategory'])
+            <p><strong>Categoría donde más gastaste:</strong> {{ $currencySummary['topCategory']['category']?->name }} ({{ number_format($currencySummary['topCategory']['percentage'], 1) }}% del total)</p>
+        @endif
+        @if ($currencySummary['bestIncomeMonth'])
+            <p><strong>Mes con mayores ingresos:</strong> {{ ucfirst($currencySummary['bestIncomeMonth']['label']) }} ({{ $currencySummary['bestIncomeMonth']['income']->format($currency, $user->locale) }})</p>
+        @endif
+        @if ($currencySummary['worstExpenseMonth'])
+            <p><strong>Mes con mayores gastos:</strong> {{ ucfirst($currencySummary['worstExpenseMonth']['label']) }} ({{ $currencySummary['worstExpenseMonth']['expense']->format($currency, $user->locale) }})</p>
+        @endif
+
+        <h2>Comparación mes a mes</h2>
+        <table class="list">
+            <thead>
+                <tr><th>Mes</th><th style="text-align:right">Ingresos</th><th style="text-align:right">Gastos</th><th style="text-align:right">Ahorro</th></tr>
+            </thead>
+            <tbody>
+                @foreach ($currencySummary['months'] as $row)
+                    <tr>
+                        <td>{{ ucfirst($row['label']) }}</td>
+                        <td style="text-align:right">{{ $row['income']->format($currency, $user->locale) }}</td>
+                        <td style="text-align:right">{{ $row['expense']->format($currency, $user->locale) }}</td>
+                        <td style="text-align:right">{{ $row['savings']->format($currency, $user->locale) }}</td>
+                    </tr>
+                @endforeach
+            </tbody>
+        </table>
+    @endforeach
 </body>
 </html>

@@ -20,7 +20,7 @@ class UpcomingRecurringPayment extends Notification
     public function toArray(object $notifiable): array
     {
         $label = $this->recurring->description ?: $this->recurring->category->name;
-        $amount = $this->recurring->amount->format($notifiable->currency_default, $notifiable->locale);
+        $amount = $this->recurring->amount->format($this->recurring->account->currency, $notifiable->locale);
 
         return [
             'type' => 'upcoming_payment',
