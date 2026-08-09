@@ -9,6 +9,7 @@
             'title' => 'Finanzas',
             'items' => [
                 ['label' => 'Transacciones', 'route' => 'transactions.index', 'icon' => 'list-bullet'],
+                ['label' => 'Importar CSV', 'route' => 'transactions.import', 'icon' => 'arrow-up-tray'],
                 ['label' => 'Ingresos', 'route' => 'incomes.index', 'icon' => 'arrow-up-circle'],
                 ['label' => 'Gastos', 'route' => 'expenses.index', 'icon' => 'arrow-down-circle'],
                 ['label' => 'Transferencias', 'route' => 'transfers.index', 'icon' => 'arrows-right-left'],

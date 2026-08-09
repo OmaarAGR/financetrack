@@ -3,6 +3,7 @@
 use App\Http\Controllers\Reports\AnnualReportPdfController;
 use App\Http\Controllers\Reports\CustomReportCsvController;
 use App\Http\Controllers\Reports\MonthlyReportPdfController;
+use App\Http\Controllers\TransactionImportTemplateController;
 use App\Livewire\Actions\Logout;
 use App\Livewire\Dashboard;
 use App\Livewire\TransactionsIndex;
@@ -30,6 +31,8 @@ Route::post('logout', function (Request $request, Logout $logout) {
 // fase del roadmap que le corresponde (ver plan de implementación).
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('finanzas/transacciones', TransactionsIndex::class)->defaults('typeFilter', 'all')->name('transactions.index');
+    Volt::route('finanzas/transacciones/importar', 'transactions.import')->name('transactions.import');
+    Route::get('finanzas/transacciones/importar/plantilla', TransactionImportTemplateController::class)->name('transactions.import.template');
     Route::get('finanzas/ingresos', TransactionsIndex::class)->defaults('typeFilter', 'income')->name('incomes.index');
     Route::get('finanzas/gastos', TransactionsIndex::class)->defaults('typeFilter', 'expense')->name('expenses.index');
     Route::get('finanzas/transferencias', TransactionsIndex::class)->defaults('typeFilter', 'transfer')->name('transfers.index');
