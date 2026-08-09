@@ -18,6 +18,8 @@ new #[Layout('layouts.app')] class extends Component
 
     public ?int $category_id = null;
 
+    public string $currency = 'COP';
+
     public string $amount = '';
 
     public string $period_type = 'monthly';
@@ -29,6 +31,7 @@ new #[Layout('layouts.app')] class extends Component
     {
         $this->authorize('create', Budget::class);
         $this->resetForm();
+        $this->currency = auth()->user()->currency_default;
         $this->showModal = true;
     }
 
@@ -39,6 +42,7 @@ new #[Layout('layouts.app')] class extends Component
 
         $this->editingId = $budget->id;
         $this->category_id = $budget->category_id;
+        $this->currency = $budget->currency;
         $this->amount = (string) $budget->amount;
         $this->period_type = $budget->period_type->value;
 
@@ -49,6 +53,7 @@ new #[Layout('layouts.app')] class extends Component
     {
         $data = $this->validate([
             'category_id' => ['required', 'integer', 'exists:categories,id'],
+            'currency' => ['required', 'string', 'size:3'],
             'amount' => ['required', 'numeric', 'gt:0'],
             'period_type' => ['required', 'in:monthly,yearly'],
         ]);
@@ -64,7 +69,7 @@ new #[Layout('layouts.app')] class extends Component
         } else {
             $this->authorize('create', Budget::class);
             auth()->user()->budgets()->updateOrCreate(
-                ['category_id' => $data['category_id'], 'period_type' => $data['period_type'], 'period_start' => $periodStart],
+                ['category_id' => $data['category_id'], 'currency' => $data['currency'], 'period_type' => $data['period_type'], 'period_start' => $periodStart],
                 ['amount' => $data['amount']],
             );
         }
@@ -99,6 +104,7 @@ new #[Layout('layouts.app')] class extends Component
     private function resetForm(): void
     {
         $this->reset(['editingId', 'category_id', 'amount']);
+        $this->currency = auth()->user()->currency_default;
         $this->period_type = 'monthly';
     }
 
@@ -119,10 +125,13 @@ new #[Layout('layouts.app')] class extends Component
                 'progress' => $service->progress($budget),
             ]);
 
+        $currencies = auth()->user()->accounts()->pluck('currency')->unique()->sort()->values();
+
         return [
             'budgets' => $budgets,
             'expenseCategories' => Category::where('type', CategoryType::Expense)->orderBy('name')->get(),
             'periodTypes' => BudgetPeriodType::cases(),
+            'currencies' => $currencies->isEmpty() ? collect([auth()->user()->currency_default]) : $currencies,
         ];
     }
 }; ?>
@@ -171,7 +180,7 @@ new #[Layout('layouts.app')] class extends Component
                                 <x-category-icon :category="$row['model']->category" />
                                 <div>
                                     <p class="font-semibold text-gray-900 dark:text-white">{{ $row['model']->category->name }}</p>
-                                    <p class="text-xs text-gray-500 dark:text-gray-400">{{ $row['model']->period_type->label() }}</p>
+                                    <p class="text-xs text-gray-500 dark:text-gray-400">{{ $row['model']->period_type->label() }} &middot; {{ $row['model']->currency }}</p>
                                 </div>
                             </div>
                             <div class="flex items-center gap-1">
@@ -186,8 +195,8 @@ new #[Layout('layouts.app')] class extends Component
 
                         <div class="mt-4">
                             <div class="mb-1 flex items-baseline justify-between text-sm">
-                                <span class="font-semibold text-gray-900 dark:text-white"><x-money :amount="$progress['spent']" /></span>
-                                <span class="text-gray-400">{{ __('de') }} <x-money :amount="$row['model']->amount" /></span>
+                                <span class="font-semibold text-gray-900 dark:text-white"><x-money :amount="$progress['spent']" :currency="$row['model']->currency" /></span>
+                                <span class="text-gray-400">{{ __('de') }} <x-money :amount="$row['model']->amount" :currency="$row['model']->currency" /></span>
                             </div>
                             <div class="h-2 w-full overflow-hidden rounded-full bg-gray-100 dark:bg-gray-700">
                                 <div class="h-full {{ $barColor }} transition-all" style="width: {{ min($progress['percentage'], 100) }}%"></div>
@@ -199,7 +208,7 @@ new #[Layout('layouts.app')] class extends Component
                                 @elseif ($progress['status'] === 'near_limit')
                                     <span class="font-medium text-orange-500">{{ __('Cerca del límite') }}</span>
                                 @else
-                                    <span class="text-gray-400"><x-money :amount="$progress['remaining']" /> {{ __('disponibles') }}</span>
+                                    <span class="text-gray-400"><x-money :amount="$progress['remaining']" :currency="$row['model']->currency" /> {{ __('disponibles') }}</span>
                                 @endif
                             </div>
                         </div>
@@ -235,10 +244,21 @@ new #[Layout('layouts.app')] class extends Component
                     <x-input-error class="mt-1" :messages="$errors->get('category_id')" />
                 </div>
 
-                <div>
-                    <x-input-label for="amount" :value="__('Monto límite')" />
-                    <x-text-input wire:model="amount" id="amount" type="number" step="0.01" min="0.01" class="mt-1 block w-full" />
-                    <x-input-error class="mt-1" :messages="$errors->get('amount')" />
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <x-input-label for="amount" :value="__('Monto límite')" />
+                        <x-text-input wire:model="amount" id="amount" type="number" step="0.01" min="0.01" class="mt-1 block w-full" />
+                        <x-input-error class="mt-1" :messages="$errors->get('amount')" />
+                    </div>
+                    <div>
+                        <x-input-label for="currency" :value="__('Moneda')" />
+                        <select wire:model="currency" id="currency" @disabled($editingId) class="mt-1 block w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-primary-500 focus:ring-primary-500 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200">
+                            @foreach ($currencies as $currencyOption)
+                                <option value="{{ $currencyOption }}">{{ $currencyOption }}</option>
+                            @endforeach
+                        </select>
+                        <x-input-error class="mt-1" :messages="$errors->get('currency')" />
+                    </div>
                 </div>
 
                 <div>

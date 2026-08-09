@@ -21,10 +21,12 @@ class BudgetService
 
         $spent = Money::of(
             Transaction::query()
-                ->where('category_id', $budget->category_id)
-                ->where('type', TransactionType::Expense->value)
-                ->whereBetween('date', [$start, $end])
-                ->sum('amount')
+                ->join('accounts', 'accounts.id', '=', 'transactions.account_id')
+                ->where('transactions.category_id', $budget->category_id)
+                ->where('transactions.type', TransactionType::Expense->value)
+                ->where('accounts.currency', $budget->currency)
+                ->whereBetween('transactions.date', [$start, $end])
+                ->sum('transactions.amount')
         );
 
         $percentage = $spent->percentageOf($budget->amount);
