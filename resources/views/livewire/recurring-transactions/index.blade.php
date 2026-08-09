@@ -121,7 +121,7 @@ new #[Layout('layouts.app')] class extends Component
     public function with(): array
     {
         return [
-            'recurrences' => auth()->user()->recurringTransactions()->with(['account', 'category'])->orderBy('next_due_date')->get(),
+            'recurrences' => auth()->user()->recurringTransactions()->with(['account' => fn ($query) => $query->withTrashed(), 'category'])->orderBy('next_due_date')->get(),
             'accounts' => Account::where('is_active', true)->orderBy('name')->get(),
             'categories' => Category::where('type', $this->type)->orderBy('name')->get(),
             'frequencies' => RecurringFrequency::cases(),

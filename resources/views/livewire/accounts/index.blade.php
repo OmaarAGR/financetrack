@@ -102,9 +102,9 @@ new #[Layout('layouts.app')] class extends Component
         $account = Account::findOrFail($this->confirmingDeleteId);
         $this->authorize('delete', $account);
 
-        if ($account->transactions()->exists()) {
+        if ($account->transactions()->exists() || $account->recurringTransactions()->exists()) {
             $account->update(['is_active' => false]);
-            $this->dispatch('toast', type: 'warning', message: __('La cuenta tiene movimientos registrados: se archivó en lugar de eliminarse.'));
+            $this->dispatch('toast', type: 'warning', message: __('La cuenta tiene movimientos o recurrentes asociados: se archivó en lugar de eliminarse.'));
         } else {
             $account->delete();
             $this->dispatch('toast', type: 'success', message: __('Cuenta eliminada.'));
