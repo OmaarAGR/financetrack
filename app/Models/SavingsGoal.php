@@ -6,12 +6,13 @@ use App\Casts\AsMoney;
 use App\Enums\SavingsGoalStatus;
 use App\Models\Concerns\BelongsToUser;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
-#[Fillable(['name', 'target_amount', 'target_date', 'icon', 'color', 'status'])]
+#[Fillable(['name', 'target_amount', 'currency', 'target_date', 'icon', 'color', 'status'])]
 class SavingsGoal extends Model
 {
     use BelongsToUser, HasFactory, SoftDeletes;
@@ -23,6 +24,13 @@ class SavingsGoal extends Model
             'target_date' => 'date',
             'status' => SavingsGoalStatus::class,
         ];
+    }
+
+    protected function currency(): Attribute
+    {
+        return Attribute::make(
+            set: fn (string $value) => strtoupper(trim($value)),
+        );
     }
 
     public function contributions(): HasMany

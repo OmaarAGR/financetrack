@@ -18,6 +18,8 @@ new #[Layout('layouts.app')] class extends Component
 
     public string $target_amount = '';
 
+    public string $currency = 'COP';
+
     public ?string $target_date = null;
 
     public string $icon = 'flag';
@@ -40,6 +42,7 @@ new #[Layout('layouts.app')] class extends Component
     {
         $this->authorize('create', SavingsGoal::class);
         $this->resetForm();
+        $this->currency = auth()->user()->currency_default;
         $this->showModal = true;
     }
 
@@ -51,6 +54,7 @@ new #[Layout('layouts.app')] class extends Component
         $this->editingId = $goal->id;
         $this->name = $goal->name;
         $this->target_amount = (string) $goal->target_amount;
+        $this->currency = $goal->currency;
         $this->target_date = $goal->target_date?->toDateString();
         $this->icon = $goal->icon;
         $this->color = $goal->color;
@@ -63,6 +67,7 @@ new #[Layout('layouts.app')] class extends Component
         $data = $this->validate([
             'name' => ['required', 'string', 'max:255'],
             'target_amount' => ['required', 'numeric', 'gt:0'],
+            'currency' => ['required', 'string', 'size:3'],
             'target_date' => ['nullable', 'date', 'after:today'],
             'icon' => ['required', 'string', 'max:32'],
             'color' => ['required', 'string', 'max:7'],
@@ -134,12 +139,16 @@ new #[Layout('layouts.app')] class extends Component
     private function resetForm(): void
     {
         $this->reset(['editingId', 'name', 'target_amount', 'target_date']);
+        $this->currency = auth()->user()->currency_default;
         $this->icon = 'flag';
         $this->color = '#2563eb';
     }
 
     public function with(): array
     {
+        $currencies = auth()->user()->accounts()->pluck('currency')->unique()->sort()->values();
+        $currencies = $currencies->isEmpty() ? collect([auth()->user()->currency_default]) : $currencies;
+
         $goals = auth()->user()->savingsGoals()
             ->whereIn('status', [SavingsGoalStatus::Active, SavingsGoalStatus::Completed])
             ->orderBy('status')
@@ -172,7 +181,7 @@ new #[Layout('layouts.app')] class extends Component
                 ];
             });
 
-        return ['goals' => $goals];
+        return ['goals' => $goals, 'currencies' => $currencies];
     }
 }; ?>
 
@@ -214,9 +223,12 @@ new #[Layout('layouts.app')] class extends Component
                                 </span>
                                 <div>
                                     <p class="font-semibold text-gray-900 dark:text-white">{{ $row['model']->name }}</p>
-                                    @if ($row['model']->target_date)
-                                        <p class="text-xs text-gray-500 dark:text-gray-400">{{ __('Meta') }}: {{ $row['model']->target_date->translatedFormat('d M Y') }}</p>
-                                    @endif
+                                    <p class="text-xs text-gray-500 dark:text-gray-400">
+                                        @if ($row['model']->target_date)
+                                            {{ __('Meta') }}: {{ $row['model']->target_date->translatedFormat('d M Y') }} &middot;
+                                        @endif
+                                        {{ $row['model']->currency }}
+                                    </p>
                                 </div>
                             </div>
                             <div class="flex items-center gap-1">
@@ -231,8 +243,8 @@ new #[Layout('layouts.app')] class extends Component
 
                         <div class="mt-4">
                             <div class="mb-1 flex items-baseline justify-between text-sm">
-                                <span class="font-semibold text-gray-900 dark:text-white"><x-money :amount="$row['saved']" /></span>
-                                <span class="text-gray-400">{{ __('de') }} <x-money :amount="$row['model']->target_amount" /></span>
+                                <span class="font-semibold text-gray-900 dark:text-white"><x-money :amount="$row['saved']" :currency="$row['model']->currency" /></span>
+                                <span class="text-gray-400">{{ __('de') }} <x-money :amount="$row['model']->target_amount" :currency="$row['model']->currency" /></span>
                             </div>
                             <div class="h-2 w-full overflow-hidden rounded-full bg-gray-100 dark:bg-gray-700">
                                 <div class="h-full rounded-full bg-primary-600 transition-all" style="width: {{ $row['percentage'] }}%"></div>
@@ -250,7 +262,7 @@ new #[Layout('layouts.app')] class extends Component
 
                             @if ($row['suggestedMonthly'])
                                 <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
-                                    {{ __('Aporte mensual sugerido') }}: <span class="font-medium text-gray-700 dark:text-gray-300"><x-money :amount="$row['suggestedMonthly']" /></span>
+                                    {{ __('Aporte mensual sugerido') }}: <span class="font-medium text-gray-700 dark:text-gray-300"><x-money :amount="$row['suggestedMonthly']" :currency="$row['model']->currency" /></span>
                                 </p>
                             @endif
                         </div>
@@ -283,10 +295,21 @@ new #[Layout('layouts.app')] class extends Component
                     <x-text-input wire:model="name" id="name" type="text" class="mt-1 block w-full" placeholder="Comprar laptop" />
                     <x-input-error class="mt-1" :messages="$errors->get('name')" />
                 </div>
-                <div>
-                    <x-input-label for="target_amount" :value="__('Valor objetivo')" />
-                    <x-text-input wire:model="target_amount" id="target_amount" type="number" step="0.01" min="0.01" class="mt-1 block w-full" />
-                    <x-input-error class="mt-1" :messages="$errors->get('target_amount')" />
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <x-input-label for="target_amount" :value="__('Valor objetivo')" />
+                        <x-text-input wire:model="target_amount" id="target_amount" type="number" step="0.01" min="0.01" class="mt-1 block w-full" />
+                        <x-input-error class="mt-1" :messages="$errors->get('target_amount')" />
+                    </div>
+                    <div>
+                        <x-input-label for="goal_currency" :value="__('Moneda')" />
+                        <select wire:model="currency" id="goal_currency" class="mt-1 block w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-primary-500 focus:ring-primary-500 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200">
+                            @foreach ($currencies as $currencyOption)
+                                <option value="{{ $currencyOption }}">{{ $currencyOption }}</option>
+                            @endforeach
+                        </select>
+                        <x-input-error class="mt-1" :messages="$errors->get('currency')" />
+                    </div>
                 </div>
                 <div>
                     <x-input-label for="target_date" :value="__('Fecha objetivo (opcional)')" />
